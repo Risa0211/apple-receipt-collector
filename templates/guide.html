@@ -1,0 +1,182 @@
+{% extends "_layout.html" %}
+{% block title %}使い方ガイド - Apple領収書コレクター{% endblock %}
+{% block content %}
+
+<h1>📘 使い方ガイド</h1>
+
+<div class="toc">
+  <strong>目次</strong>
+  <ul style="margin: 8px 0 0; padding-left: 22px;">
+    <li><a href="#about">このツールについて</a></li>
+    <li><a href="#flow">全体の流れ</a></li>
+    <li><a href="#forwarding">各Gmailからの自動転送設定</a>（メイン手順）</li>
+    <li><a href="#verify">動作確認</a></li>
+    <li><a href="#trouble">トラブルシューティング</a></li>
+  </ul>
+</div>
+
+<h2 id="about">このツールについて</h2>
+<div class="card">
+  <p>Apple Onlineで購入した際に届く領収書PDFを、Googleドライブの月別フォルダに自動保存します。</p>
+  <p><strong>保存先</strong>: マイドライブ /
+    <code>iPhone領収書</code> /
+    <code>2026年05月 iPhone領収書</code> （受信月で自動振り分け）
+  </p>
+  <p><strong>実行間隔</strong>: 1時間ごとに自動実行 + ホーム画面の「今すぐ同期」で手動実行可能</p>
+</div>
+
+<h2 id="flow">全体の流れ</h2>
+<div class="card">
+  <ol>
+    <li><strong>eightmedia0808@gmail.com</strong> にApple領収書を集約する（このツールが監視するアカウント）</li>
+    <li>各Gmailアカウントで <strong>「Apple領収書だけを転送する」フィルタ</strong> を設定</li>
+    <li>転送されたメールがeightmedia0808に届く</li>
+    <li>ツールが1時間ごとに添付PDFを取得 → ドライブに自動保存</li>
+  </ol>
+  <div class="callout success">
+    💡 ポイント: <strong>領収書以外のメールは転送されません</strong>。フィルタの条件にマッチしたメールだけが転送対象です。
+  </div>
+</div>
+
+<h2 id="forwarding">各Gmailからの自動転送設定</h2>
+<p class="small">領収書が届くGmailアカウント1つあたり、初回のみ約2-3分の設定が必要です。一度設定すれば永続的に有効です。</p>
+
+<h3>STEP A: 転送先アドレスを登録</h3>
+
+<div class="step">
+  <div class="step-head">A-1. 転送元のGmailにログイン</div>
+  <ol>
+    <li>右上の <strong>歯車アイコン</strong> をクリック</li>
+    <li><strong>「すべての設定を表示」</strong> をクリック</li>
+    <li>上部タブ <strong>「メール転送と POP/IMAP」</strong> を選択</li>
+    <li><strong>「転送先アドレスを追加」</strong> ボタンをクリック</li>
+  </ol>
+</div>
+
+<div class="step">
+  <div class="step-head">A-2. 転送先を入力</div>
+  <p>以下のアドレスをコピーして貼り付け:</p>
+  <div class="copy-block">
+    <code>eightmedia0808@gmail.com</code>
+    <button class="copy-btn" onclick="copyText('eightmedia0808@gmail.com', this)">コピー</button>
+  </div>
+  <p>「次へ」→「続行」と進む</p>
+</div>
+
+<div class="step">
+  <div class="step-head">A-3. 確認メールを承認</div>
+  <ol>
+    <li><strong>eightmedia0808@gmail.com</strong> の受信箱を開く</li>
+    <li>「Gmail Forwarding Confirmation」のような確認メールが届いている</li>
+    <li>メール内の <strong>確認リンク</strong> をクリック</li>
+    <li>承認ページで <strong>「確認」</strong> ボタンをクリック</li>
+  </ol>
+</div>
+
+<div class="step">
+  <div class="step-head">A-4. 元のGmailで確認</div>
+  <ol>
+    <li>転送元のGmailの「メール転送と POP/IMAP」画面を再読込</li>
+    <li>登録したアドレスが <strong>「確認済」</strong> になっていればOK</li>
+  </ol>
+  <div class="callout danger">
+    ⚠ 重要: ここで <strong>「受信メールを転送する」のラジオボタンは選ばないでください</strong>。<br>
+    全メールが転送されてしまいます。STEP Bで条件付き転送を設定します。
+  </div>
+</div>
+
+<h3>STEP B: Apple領収書だけ転送するフィルタを作成</h3>
+
+<div class="step">
+  <div class="step-head">B-1. フィルタ作成画面を開く</div>
+  <ol>
+    <li>同じ設定画面の上部タブ <strong>「フィルタとブロック中のアドレス」</strong> をクリック</li>
+    <li><strong>「新しいフィルタを作成」</strong> をクリック</li>
+  </ol>
+</div>
+
+<div class="step">
+  <div class="step-head">B-2. 検索条件を入力</div>
+  <p><strong>From</strong> 欄に以下を貼り付け:</p>
+  <div class="copy-block">
+    <code>noreply@email.apple.com</code>
+    <button class="copy-btn" onclick="copyText('noreply@email.apple.com', this)">コピー</button>
+  </div>
+  <p><strong>件名</strong> 欄に以下を貼り付け:</p>
+  <div class="copy-block">
+    <code>請求金額のお知らせ</code>
+    <button class="copy-btn" onclick="copyText('請求金額のお知らせ', this)">コピー</button>
+  </div>
+  <p>右下の <strong>「フィルタを作成」</strong> をクリック</p>
+</div>
+
+<div class="step">
+  <div class="step-head">B-3. アクションを設定</div>
+  <p>表示されるチェックボックス一覧から:</p>
+  <ol>
+    <li>☑ <strong>「次のアドレスに転送する」</strong> にチェック</li>
+    <li>ドロップダウンから <strong>eightmedia0808@gmail.com</strong> を選択</li>
+    <li>（任意）☑ 「既読にする」にチェックを入れると元のGmailで未読にならない</li>
+    <li>（任意・推奨）一番下の <strong>「○件の一致するスレッドにもフィルタを適用する」</strong> にチェック<br>
+        → 過去のApple領収書も一括で転送できます</li>
+    <li>右下の <strong>「フィルタを作成」</strong> ボタンをクリック</li>
+  </ol>
+</div>
+
+<div class="callout success">
+  ✅ これでこのGmailの設定は完了！以降Apple領収書が届くと自動で eightmedia0808 に転送されます。
+</div>
+
+<h3>STEP C: 必要なアカウント数だけ繰り返し</h3>
+<p>追加したいGmailアカウントごとに STEP A・B を繰り返してください。</p>
+
+<h2 id="verify">動作確認</h2>
+<div class="card">
+  <ol>
+    <li>ホーム画面に戻り、<a href="{{ url_for('index') }}">「🔄 今すぐ同期」</a> ボタンをクリック</li>
+    <li>「直近の処理ログ」に保存されたPDFが表示されればOK</li>
+    <li>Googleドライブの <strong>iPhone領収書/2026年〇〇月 iPhone領収書/</strong> フォルダにファイルが入っているか確認</li>
+  </ol>
+  <p class="small">過去の領収書を一括取り込みしたい場合は、各Gmailのフィルタ作成時に「○件の一致するスレッドにもフィルタを適用する」にチェックを入れて転送してから、ホームの「今すぐ同期」を実行してください。</p>
+</div>
+
+<h2 id="trouble">トラブルシューティング</h2>
+<div class="card">
+  <h3 style="color:#c93030;">転送先確認メールが届かない</h3>
+  <p>eightmedia0808のスパムフォルダを確認。それでもなければ転送先登録をやり直す。</p>
+
+  <h3 style="color:#c93030;">同期しても新しい領収書が保存されない</h3>
+  <ul>
+    <li>転送設定が正しく動作しているか: 元のGmailから自分宛にテストメールを転送できるか確認</li>
+    <li>ホームの「同期実行履歴」でエラーメッセージを確認</li>
+    <li>処理済みのメールは再度保存されません（重複防止）。新しいメールだけが対象</li>
+  </ul>
+
+  <h3 style="color:#c93030;">Driveフォルダが見えない</h3>
+  <p>ホーム画面でDriveアカウントを「解除」→「再設定」して、ドライブの権限を許可し直してください。</p>
+
+  <h3 style="color:#c93030;">同じファイルが二重に保存される</h3>
+  <p>通常は重複防止が効きます。同じファイル名で内容が違う場合のみ保存されます。Driveで手動削除してください。</p>
+
+  <h3 style="color:#c93030;">ログを確認したい</h3>
+  <p>ターミナルで以下のファイルを確認:</p>
+  <div class="copy-block">
+    <code>~/apple-receipt-collector/logs/sync.log</code>
+  </div>
+  <div class="copy-block">
+    <code>~/apple-receipt-collector/logs/ui.log</code>
+  </div>
+</div>
+
+<script>
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ コピー済';
+    btn.style.background = '#2a7c2a';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+  });
+}
+</script>
+
+{% endblock %}

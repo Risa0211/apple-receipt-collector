@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: apple-receipt-collector
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: APP_SECRET_KEY
+        sync: false
+      - key: CRON_TRIGGER_TOKEN
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: GOOGLE_CREDENTIALS_JSON_PATH
+        value: /etc/secrets/credentials.json

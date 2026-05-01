@@ -1,0 +1,149 @@
+{% extends "_layout.html" %}
+{% block title %}ホーム - Apple領収書コレクター{% endblock %}
+{% block content %}
+
+<h1>📧 Apple領収書 自動コレクター</h1>
+<p class="small">受信箱からApple「請求金額のお知らせ」のPDFを自動でGoogleドライブの月別フォルダに保存します。</p>
+
+{% if not credentials_set %}
+<div class="card">
+  <strong class="err">⚠ credentials.json が未設置です</strong>
+  <p class="small">プロジェクトディレクトリの SETUP.txt の手順に沿ってGoogle Cloud ConsoleでOAuthクライアントを作成し、<br>
+  <code>~/apple-receipt-collector/credentials.json</code> として保存してください。</p>
+</div>
+{% endif %}
+
+<h2>1. Googleドライブ保存先アカウント</h2>
+<div class="card">
+  {% if drive_email %}
+    <span class="ok">✓ 設定済</span>: <strong>{{ drive_email }}</strong>
+    <form method="post" action="{{ url_for('remove_drive') }}" style="display:inline; margin-left:12px;"
+          onsubmit="return confirm('Drive連携を解除しますか？');">
+      <button class="btn-danger" type="submit">解除</button>
+    </form>
+  {% elif credentials_set %}
+    <span class="warn">未設定</span>
+    <p class="small">PDFの保存先となるGoogleアカウント（eightmedia0808@gmail.com）でログインしてください。</p>
+    <a class="btn" href="{{ url_for('oauth_start', kind='drive') }}">Driveアカウントを設定</a>
+  {% endif %}
+</div>
+
+<h2>2. 監視するGmailアカウント</h2>
+<div class="card">
+  {% if credentials_set and drive_email %}
+    <a class="btn" href="{{ url_for('oauth_start', kind='gmail') }}">+ Gmailアカウントを追加</a>
+    <span class="small" style="margin-left:12px;">📘 各Gmailの転送設定方法は<a href="{{ url_for('guide') }}">使い方ガイド</a>参照</span>
+  {% else %}
+    <p class="small">先に上のDriveアカウント設定を完了してください。</p>
+  {% endif %}
+
+  {% if gmail_accounts %}
+  <table style="margin-top:14px;">
+    <tr><th>アドレス</th><th>追加日</th><th>最終同期</th><th>前回保存</th><th>状態</th><th></th></tr>
+    {% for a in gmail_accounts %}
+    <tr>
+      <td>{{ a.email }}</td>
+      <td class="small">{{ a.added_at[:10] }}</td>
+      <td class="small">{{ a.last_sync_at or "—" }}</td>
+      <td>{{ a.last_sync_count }}</td>
+      <td>{% if a.last_error %}<span class="err">{{ a.last_error[:60] }}</span>{% else %}<span class="ok">OK</span>{% endif %}</td>
+      <td>
+        <form method="post" action="{{ url_for('remove_account') }}"
+              onsubmit="return confirm('{{ a.email }} を削除しますか？');">
+          <input type="hidden" name="email" value="{{ a.email }}">
+          <button class="btn-danger" type="submit">削除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty" style="margin-top:10px;">登録済みアカウントなし</p>
+  {% endif %}
+</div>
+
+<h2>3. 同期</h2>
+<div class="card">
+  <button id="syncBtn" onclick="runSync()">🔄 今すぐ同期</button>
+  <span class="small" style="margin-left:12px;">launchdで1時間ごとに自動実行されます</span>
+  <div id="syncStatus" style="margin-top:12px;"></div>
+  <pre id="syncLog" style="display:none;"></pre>
+</div>
+
+<h2>4. 直近の処理ログ</h2>
+<div class="card">
+  <p class="small">累計保存数: <span class="badge">{{ total_processed }}</span></p>
+  {% if recent %}
+  <table>
+    <tr><th>日時</th><th>アカウント</th><th>ファイル名</th><th>月</th></tr>
+    {% for r in recent %}
+    <tr>
+      <td class="small">{{ r.processed_at }}</td>
+      <td class="small">{{ r.account_email }}</td>
+      <td>{{ r.pdf_filename or "(添付なし)" }}</td>
+      <td>{{ r.receipt_year_month }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">まだ処理ログがありません</p>
+  {% endif %}
+</div>
+
+<h2>5. 同期実行履歴</h2>
+<div class="card">
+  {% if sync_logs %}
+  <table>
+    <tr><th>開始</th><th>終了</th><th>アカウント</th><th>保存件数</th><th>エラー</th></tr>
+    {% for s in sync_logs %}
+    <tr>
+      <td class="small">{{ s.started_at }}</td>
+      <td class="small">{{ s.finished_at or "実行中" }}</td>
+      <td>{{ s.accounts_scanned }}</td>
+      <td>{{ s.pdfs_uploaded }}</td>
+      <td class="err small">{{ s.errors[:80] if s.errors else "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">実行履歴なし</p>
+  {% endif %}
+</div>
+
+<script>
+async function runSync() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+  const logEl = document.getElementById('syncLog');
+  btn.disabled = true; btn.textContent = '⏳ 実行中…';
+  status.innerHTML = '<span class="small">スキャン中…</span>';
+  logEl.style.display = 'block'; logEl.textContent = '';
+
+  const poll = setInterval(async () => {
+    const r = await fetch('{{ url_for("sync_progress") }}');
+    const j = await r.json();
+    logEl.textContent = j.log.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }, 600);
+
+  try {
+    const res = await fetch('{{ url_for("manual_sync") }}', { method: 'POST' });
+    const data = await res.json();
+    clearInterval(poll);
+    if (data.status === 'ok') {
+      logEl.textContent = data.log.join('\n');
+      status.innerHTML = `<span class="ok">✓ 完了 (${data.result.uploaded}件保存 / ${data.result.accounts}アカウント)</span>`;
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      status.innerHTML = `<span class="err">${data.message || 'エラー'}</span>`;
+    }
+  } catch (e) {
+    clearInterval(poll);
+    status.innerHTML = `<span class="err">エラー: ${e}</span>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 今すぐ同期';
+  }
+}
+</script>
+
+{% endblock %}

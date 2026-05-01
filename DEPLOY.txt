@@ -1,0 +1,131 @@
+================================================================
+Renderへのデプロイ手順
+================================================================
+
+【前提】
+- Supabaseプロジェクト作成 + supabase_schema.sql実行済み
+- Google Cloud ConsoleでOAuthクライアント作成済み
+
+----------------------------------------------------------------
+【ステップ1】GitHubリポジトリにpush
+----------------------------------------------------------------
+新規リポジトリ作成（プライベート推奨）:
+   cd /Users/risa/apple-receipt-collector
+   git init
+   git add .
+   git commit -m "Initial commit"
+   gh repo create apple-receipt-collector --private --source=. --push
+
+または手動で github.com で作って:
+   git remote add origin https://github.com/YOUR_USERNAME/apple-receipt-collector.git
+   git branch -M main
+   git push -u origin main
+
+⚠ .env と credentials.json は .gitignore に入っているのでpushされません
+
+----------------------------------------------------------------
+【ステップ2】Render新規Web Service作成
+----------------------------------------------------------------
+1. https://dashboard.render.com/ にログイン
+2. 「New」→「Web Service」
+3. GitHubリポジトリ「apple-receipt-collector」を選択
+4. 設定:
+   - Name: apple-receipt-collector
+   - Region: Singapore
+   - Branch: main
+   - Runtime: Python 3
+   - Build Command: pip install -r requirements.txt
+   - Start Command: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1
+   - Plan: Free
+
+----------------------------------------------------------------
+【ステップ3】環境変数を設定
+----------------------------------------------------------------
+Renderの Environment タブで以下を追加:
+
+| Key | Value |
+|-----|-------|
+| SUPABASE_URL | https://tyztslnjtuofzyulprym.supabase.co |
+| SUPABASE_SERVICE_ROLE_KEY | (.envファイルからコピー) |
+| APP_PASSWORD | zfPTdPf8IJNASHHl |
+| APP_SECRET_KEY | (.envファイルからコピー) |
+| CRON_TRIGGER_TOKEN | (.envファイルからコピー) |
+| GOOGLE_CREDENTIALS_JSON_PATH | /etc/secrets/credentials.json |
+| PYTHON_VERSION | 3.11.10 |
+
+⚠ PUBLIC_BASE_URL は次のステップで決まる
+
+----------------------------------------------------------------
+【ステップ4】Secret Files に credentials.json をアップロード
+----------------------------------------------------------------
+Renderの Environment タブの下部「Secret Files」セクション:
+1. 「Add Secret File」をクリック
+2. Filename: credentials.json
+3. Contents: ローカルの ~/apple-receipt-collector/credentials.json の中身を貼り付け
+4. 保存
+
+----------------------------------------------------------------
+【ステップ5】デプロイ完了→公開URL確認
+----------------------------------------------------------------
+1. デプロイが完了するまで2-3分待つ
+2. 上部に表示される URL をコピー
+   例: https://apple-receipt-collector-XXXX.onrender.com
+3. その URL を環境変数 PUBLIC_BASE_URL として再度 Environment に追加
+4. 「Manual Deploy」→「Deploy latest commit」で再デプロイ
+
+----------------------------------------------------------------
+【ステップ6】Google Cloud ConsoleでリダイレクトURIを追加
+----------------------------------------------------------------
+1. https://console.cloud.google.com/apis/credentials を開く
+2. 既存のOAuthクライアントを開く
+3. 「承認済みのリダイレクトURI」に以下を追加:
+   https://apple-receipt-collector-XXXX.onrender.com/oauth/drive/callback
+   https://apple-receipt-collector-XXXX.onrender.com/oauth/gmail/callback
+4. 保存
+
+⚠ ローカル用の http://localhost:8765/... は残しておいてOK
+
+----------------------------------------------------------------
+【ステップ7】cron-job.org で1時間毎の自動同期を設定
+----------------------------------------------------------------
+1. https://cron-job.org/ で無料アカウント作成
+2. 「Create cronjob」をクリック
+3. 設定:
+   - Title: Apple Receipt Sync
+   - URL: https://apple-receipt-collector-XXXX.onrender.com/api/sync/trigger
+   - Method: POST
+   - Custom HTTP headers:
+       X-Cron-Token: 99i1U3wA4mYUHgyaww6Hg8vMvT6oYRRaqfCGLnmjjRs
+   - Schedule: Every hour (0 * * * *)
+4. Save
+
+----------------------------------------------------------------
+【ステップ8】公開URLにアクセスして動作確認
+----------------------------------------------------------------
+1. https://apple-receipt-collector-XXXX.onrender.com を開く
+2. パスワード zfPTdPf8IJNASHHl でログイン
+3. Driveアカウントを設定 → eightmedia0808@gmail.com
+4. Gmailアカウントを追加 → eightmedia0808@gmail.com
+5. 「今すぐ同期」で動作確認
+
+----------------------------------------------------------------
+【完了】依頼主にURL+パスワードを共有
+----------------------------------------------------------------
+- URL: https://apple-receipt-collector-XXXX.onrender.com
+- パスワード: zfPTdPf8IJNASHHl
+
+依頼主は使い方ガイドタブを見ながら各Gmailの転送設定を行います。
+
+----------------------------------------------------------------
+【注意点】
+----------------------------------------------------------------
+■ Render無料プラン
+- 15分アクセスがないとスリープ (起動に30秒程度)
+- cron-job.orgからのアクセスで定期的に起こされる
+- 月750時間まで無料 (24時間稼働で1ヶ月OK)
+
+■ ローカルのlaunchd
+- Renderに移行後はlaunchdは不要になります
+  launchctl unload ~/Library/LaunchAgents/com.eightmedia.apple-receipt-ui.plist
+  launchctl unload ~/Library/LaunchAgents/com.eightmedia.apple-receipt-sync.plist
+  rm ~/Library/LaunchAgents/com.eightmedia.apple-receipt-*.plist
