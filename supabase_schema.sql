@@ -64,3 +64,13 @@ ALTER TABLE processed_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE drive_folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_log ENABLE ROW LEVEL SECURITY;
 -- ポリシーを作らないので anon は読み書き不可、service_role のみ可能
+
+-- ===== service_role への明示GRANT =====
+-- 2026-05-30 以降の Supabase Data API ルール変更対応
+-- （public スキーマのテーブルが自動公開されなくなり、明示GRANTが必須に）
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  drive_token, gmail_accounts, processed_messages, drive_folders, sync_log
+TO service_role;
+
+-- sync_log は BIGSERIAL の id 列があるためシーケンス GRANT も必要
+GRANT USAGE, SELECT ON SEQUENCE sync_log_id_seq TO service_role;

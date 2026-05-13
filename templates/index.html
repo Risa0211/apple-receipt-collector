@@ -111,6 +111,26 @@
 </div>
 
 <script>
+const JSON_FETCH = {
+  headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' }
+};
+
+async function fetchJSON(url, options = {}) {
+  const merged = {
+    ...options,
+    headers: { ...JSON_FETCH.headers, ...(options.headers || {}) }
+  };
+  const res = await fetch(url, merged);
+  if (res.status === 401) {
+    const data = await res.json().catch(() => ({}));
+    const target = data.login_url || '/login';
+    alert('セッションの有効期限が切れました。再ログインしてください。');
+    location.href = target + '?next=' + encodeURIComponent(location.pathname);
+    throw new Error('unauthorized');
+  }
+  return res;
+}
+
 async function runSync() {
   const btn = document.getElementById('syncBtn');
   const status = document.getElementById('syncStatus');
@@ -120,14 +140,16 @@ async function runSync() {
   logEl.style.display = 'block'; logEl.textContent = '';
 
   const poll = setInterval(async () => {
-    const r = await fetch('{{ url_for("sync_progress") }}');
-    const j = await r.json();
-    logEl.textContent = j.log.join('\n');
-    logEl.scrollTop = logEl.scrollHeight;
+    try {
+      const r = await fetchJSON('{{ url_for("sync_progress") }}');
+      const j = await r.json();
+      logEl.textContent = j.log.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+    } catch (_) { clearInterval(poll); }
   }, 600);
 
   try {
-    const res = await fetch('{{ url_for("manual_sync") }}', { method: 'POST' });
+    const res = await fetchJSON('{{ url_for("manual_sync") }}', { method: 'POST' });
     const data = await res.json();
     clearInterval(poll);
     if (data.status === 'ok') {
@@ -139,7 +161,9 @@ async function runSync() {
     }
   } catch (e) {
     clearInterval(poll);
-    status.innerHTML = `<span class="err">エラー: ${e}</span>`;
+    if (e.message !== 'unauthorized') {
+      status.innerHTML = `<span class="err">エラー: ${e}</span>`;
+    }
   } finally {
     btn.disabled = false; btn.textContent = '🔄 今すぐ同期';
   }

@@ -47,6 +47,12 @@ def require_login(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if APP_PASSWORD and not session.get("logged_in"):
+            wants_json = (
+                request.headers.get("X-Requested-With") == "fetch"
+                or "application/json" in request.headers.get("Accept", "")
+            )
+            if wants_json:
+                return jsonify({"status": "unauthorized", "login_url": url_for("login")}), 401
             return redirect(url_for("login", next=request.path))
         return f(*args, **kwargs)
     return wrapper
