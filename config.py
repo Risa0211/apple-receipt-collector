@@ -5,10 +5,20 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 
-# credentials.jsonはローカルファイル or 環境変数 GOOGLE_CREDENTIALS_JSON
-# Render等のクラウドではディスクが揮発的なので環境変数推奨
-_creds_env = os.environ.get("GOOGLE_CREDENTIALS_JSON_PATH")
-CREDENTIALS_PATH = Path(_creds_env) if _creds_env else BASE_DIR / "credentials.json"
+# credentials.json の取得元 (優先順):
+#   1. GOOGLE_CREDENTIALS_JSON (JSON文字列) ... Koyeb等、ファイルマウントできないPaaS向け
+#   2. GOOGLE_CREDENTIALS_JSON_PATH (パス) ... Render Secret Files向け
+#   3. ローカルの credentials.json
+_creds_env_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+_creds_env_path = os.environ.get("GOOGLE_CREDENTIALS_JSON_PATH")
+
+if _creds_env_json:
+    CREDENTIALS_PATH = Path("/tmp/credentials.json")
+    CREDENTIALS_PATH.write_text(_creds_env_json, encoding="utf-8")
+elif _creds_env_path:
+    CREDENTIALS_PATH = Path(_creds_env_path)
+else:
+    CREDENTIALS_PATH = BASE_DIR / "credentials.json"
 
 UI_HOST = "127.0.0.1"
 UI_PORT = 8765
