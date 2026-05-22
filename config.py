@@ -6,13 +6,21 @@ BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 
 # credentials.json の取得元 (優先順):
-#   1. GOOGLE_CREDENTIALS_JSON (JSON文字列) ... Koyeb等、ファイルマウントできないPaaS向け
-#   2. GOOGLE_CREDENTIALS_JSON_PATH (パス) ... Render Secret Files向け
-#   3. ローカルの credentials.json
+#   1. GOOGLE_CREDENTIALS_JSON_BASE64 (Base64エンコードしたJSON) ... Cloud Run等のUIでクオートエスケープ事故を防ぐ
+#   2. GOOGLE_CREDENTIALS_JSON (JSON文字列そのまま) ... ローカル等で素直に渡す場合
+#   3. GOOGLE_CREDENTIALS_JSON_PATH (パス) ... Render Secret Files向け
+#   4. ローカルの credentials.json
+import base64
+
+_creds_env_b64 = os.environ.get("GOOGLE_CREDENTIALS_JSON_BASE64")
 _creds_env_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
 _creds_env_path = os.environ.get("GOOGLE_CREDENTIALS_JSON_PATH")
 
-if _creds_env_json:
+if _creds_env_b64:
+    decoded = base64.b64decode(_creds_env_b64).decode("utf-8")
+    CREDENTIALS_PATH = Path("/tmp/credentials.json")
+    CREDENTIALS_PATH.write_text(decoded, encoding="utf-8")
+elif _creds_env_json:
     CREDENTIALS_PATH = Path("/tmp/credentials.json")
     CREDENTIALS_PATH.write_text(_creds_env_json, encoding="utf-8")
 elif _creds_env_path:
