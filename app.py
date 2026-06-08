@@ -24,6 +24,8 @@ from config import UI_HOST, UI_PORT
 from core import auth, db, drive_uploader
 from core.sync_engine import run_sync
 
+db.init_db()
+
 
 # 本番（HTTPS）では1にしない。Render経由のhttps://はFlaskにはhttpに見えるのでFlaskの動作的にはこれを許可する必要あり
 os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")

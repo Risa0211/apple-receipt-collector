@@ -1,131 +1,147 @@
-================================================================
-Renderへのデプロイ手順
-================================================================
+PythonAnywhere Free 移設手順
+==================================
 
-【前提】
-- Supabaseプロジェクト作成 + supabase_schema.sql実行済み
-- Google Cloud ConsoleでOAuthクライアント作成済み
+前提:
+  - PA Free アカウント: eight0808
+  - URL: https://eight0808.pythonanywhere.com
+  - DB: SQLite (PA永続ディスク)  ※Supabase不要
+  - 定期実行: cron-job.org（既存）からURL差し替えのみ
 
-----------------------------------------------------------------
-【ステップ1】GitHubリポジトリにpush
-----------------------------------------------------------------
-新規リポジトリ作成（プライベート推奨）:
-   cd /Users/risa/apple-receipt-collector
-   git init
-   git add .
-   git commit -m "Initial commit"
-   gh repo create apple-receipt-collector --private --source=. --push
+----------------------------------
+ステップ1: PA Bashコンソールでコード配置
+----------------------------------
+PA Dashboard → 「Consoles」タブ → 「$ Bash」を開く
 
-または手動で github.com で作って:
-   git remote add origin https://github.com/YOUR_USERNAME/apple-receipt-collector.git
-   git branch -M main
-   git push -u origin main
+  cd ~
+  git clone https://github.com/Risa0211/apple-receipt-collector.git
+  cd apple-receipt-collector
+  python3.10 -m venv venv
+  source venv/bin/activate
+  pip install --upgrade pip
+  pip install -r requirements.txt
 
-⚠ .env と credentials.json は .gitignore に入っているのでpushされません
+----------------------------------
+ステップ2: credentials.json と .env を配置
+----------------------------------
+PA Dashboard → 「Files」タブ
+  /home/eight0808/apple-receipt-collector/ に移動
 
-----------------------------------------------------------------
-【ステップ2】Render新規Web Service作成
-----------------------------------------------------------------
-1. https://dashboard.render.com/ にログイン
-2. 「New」→「Web Service」
-3. GitHubリポジトリ「apple-receipt-collector」を選択
-4. 設定:
-   - Name: apple-receipt-collector
-   - Region: Singapore
-   - Branch: main
-   - Runtime: Python 3
-   - Build Command: pip install -r requirements.txt
-   - Start Command: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1
-   - Plan: Free
+A) credentials.json をアップロード
+   ローカルの ~/apple-receipt-collector/credentials.json を
+   「Upload a file」ボタンから配置
 
-----------------------------------------------------------------
-【ステップ3】環境変数を設定
-----------------------------------------------------------------
-Renderの Environment タブで以下を追加:
+B) .env ファイル作成
+   「New file」 → ファイル名: .env  → 内容:
 
-| Key | Value |
-|-----|-------|
-| SUPABASE_URL | https://tyztslnjtuofzyulprym.supabase.co |
-| SUPABASE_SERVICE_ROLE_KEY | (.envファイルからコピー) |
-| APP_PASSWORD | zfPTdPf8IJNASHHl |
-| APP_SECRET_KEY | (.envファイルからコピー) |
-| CRON_TRIGGER_TOKEN | (.envファイルからコピー) |
-| GOOGLE_CREDENTIALS_JSON_PATH | /etc/secrets/credentials.json |
-| PYTHON_VERSION | 3.11.10 |
+     APP_PASSWORD=zfPTdPf8IJNASHHl
+     APP_SECRET_KEY=（32文字のhex・後述コマンドで生成）
+     CRON_TRIGGER_TOKEN=99i1U3wA4mYUHgyaww6Hg8vMvT6oYRRaqfCGLnmjjRs
+     PUBLIC_BASE_URL=https://eight0808.pythonanywhere.com
 
-⚠ PUBLIC_BASE_URL は次のステップで決まる
+   APP_SECRET_KEY 生成（Bashコンソールで）:
+     python3 -c "import secrets; print(secrets.token_hex(32))"
 
-----------------------------------------------------------------
-【ステップ4】Secret Files に credentials.json をアップロード
-----------------------------------------------------------------
-Renderの Environment タブの下部「Secret Files」セクション:
-1. 「Add Secret File」をクリック
-2. Filename: credentials.json
-3. Contents: ローカルの ~/apple-receipt-collector/credentials.json の中身を貼り付け
-4. 保存
+----------------------------------
+ステップ3: Webアプリを作成
+----------------------------------
+PA Dashboard → 「Web」タブ → 「Add a new web app」
 
-----------------------------------------------------------------
-【ステップ5】デプロイ完了→公開URL確認
-----------------------------------------------------------------
-1. デプロイが完了するまで2-3分待つ
-2. 上部に表示される URL をコピー
-   例: https://apple-receipt-collector-XXXX.onrender.com
-3. その URL を環境変数 PUBLIC_BASE_URL として再度 Environment に追加
-4. 「Manual Deploy」→「Deploy latest commit」で再デプロイ
+1. ドメイン: eight0808.pythonanywhere.com  (デフォルト)
+2. Pythonウェブフレームワーク → 「Manual configuration」
+3. Pythonバージョン → 「Python 3.10」
+4. 完了したらWeb設定ページで以下を編集:
 
-----------------------------------------------------------------
-【ステップ6】Google Cloud ConsoleでリダイレクトURIを追加
-----------------------------------------------------------------
-1. https://console.cloud.google.com/apis/credentials を開く
-2. 既存のOAuthクライアントを開く
-3. 「承認済みのリダイレクトURI」に以下を追加:
-   https://apple-receipt-collector-XXXX.onrender.com/oauth/drive/callback
-   https://apple-receipt-collector-XXXX.onrender.com/oauth/gmail/callback
-4. 保存
+  「Code」セクション:
+    - Source code:        /home/eight0808/apple-receipt-collector
+    - Working directory:  /home/eight0808/apple-receipt-collector
 
-⚠ ローカル用の http://localhost:8765/... は残しておいてOK
+  「Virtualenv」セクション:
+    - 入力: /home/eight0808/apple-receipt-collector/venv
 
-----------------------------------------------------------------
-【ステップ7】cron-job.org で1時間毎の自動同期を設定
-----------------------------------------------------------------
-1. https://cron-job.org/ で無料アカウント作成
-2. 「Create cronjob」をクリック
-3. 設定:
-   - Title: Apple Receipt Sync
-   - URL: https://apple-receipt-collector-XXXX.onrender.com/api/sync/trigger
-   - Method: POST
-   - Custom HTTP headers:
-       X-Cron-Token: 99i1U3wA4mYUHgyaww6Hg8vMvT6oYRRaqfCGLnmjjRs
-   - Schedule: Every hour (0 * * * *)
-4. Save
+  「WSGI configuration file」: リンクをクリックしてエディタを開き、
+    中身を全削除して下記を貼り付け:
 
-----------------------------------------------------------------
-【ステップ8】公開URLにアクセスして動作確認
-----------------------------------------------------------------
-1. https://apple-receipt-collector-XXXX.onrender.com を開く
-2. パスワード zfPTdPf8IJNASHHl でログイン
-3. Driveアカウントを設定 → eightmedia0808@gmail.com
-4. Gmailアカウントを追加 → eightmedia0808@gmail.com
-5. 「今すぐ同期」で動作確認
+    ----- WSGI設定ここから -----
+    import os
+    import sys
 
-----------------------------------------------------------------
-【完了】依頼主にURL+パスワードを共有
-----------------------------------------------------------------
-- URL: https://apple-receipt-collector-XXXX.onrender.com
-- パスワード: zfPTdPf8IJNASHHl
+    project_home = "/home/eight0808/apple-receipt-collector"
+    if project_home not in sys.path:
+        sys.path.insert(0, project_home)
 
-依頼主は使い方ガイドタブを見ながら各Gmailの転送設定を行います。
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(project_home, ".env"))
 
-----------------------------------------------------------------
-【注意点】
-----------------------------------------------------------------
-■ Render無料プラン
-- 15分アクセスがないとスリープ (起動に30秒程度)
-- cron-job.orgからのアクセスで定期的に起こされる
-- 月750時間まで無料 (24時間稼働で1ヶ月OK)
+    from app import app as application
+    ----- ここまで -----
 
-■ ローカルのlaunchd
-- Renderに移行後はlaunchdは不要になります
-  launchctl unload ~/Library/LaunchAgents/com.eightmedia.apple-receipt-ui.plist
-  launchctl unload ~/Library/LaunchAgents/com.eightmedia.apple-receipt-sync.plist
-  rm ~/Library/LaunchAgents/com.eightmedia.apple-receipt-*.plist
+  「Static files」セクション（任意）:
+    - URL:  /static/
+    - Path: /home/eight0808/apple-receipt-collector/static
+
+5. ページ上部の緑「Reload eight0808.pythonanywhere.com」をクリック
+
+----------------------------------
+ステップ4: 動作確認
+----------------------------------
+ブラウザで https://eight0808.pythonanywhere.com を開く
+→ ログイン画面が出れば成功
+→ パスワード zfPTdPf8IJNASHHl で入る
+
+----------------------------------
+ステップ5: Google Cloud Console で OAuth リダイレクトURI追加
+----------------------------------
+https://console.cloud.google.com/apis/credentials
+  → 該当OAuthクライアントID（Apple Receipt Collector プロジェクトのもの）を編集
+  → 「承認済みのリダイレクトURI」に追加:
+
+    https://eight0808.pythonanywhere.com/oauth/drive/callback
+    https://eight0808.pythonanywhere.com/oauth/gmail/callback
+
+  → 保存
+
+----------------------------------
+ステップ6: Drive / Gmail を再認証
+----------------------------------
+https://eight0808.pythonanywhere.com のホーム画面で:
+  - 「Driveアカウントを設定」 → eightmedia0808@gmail.com で許可
+  - 「Gmailアカウントを追加」 → eightmedia0808@gmail.com で許可
+    （複数アカウントの自動転送設定は既にあるので、転送先1個でOK）
+
+----------------------------------
+ステップ7: cron-job.org の発火URLを差し替え
+----------------------------------
+https://cron-job.org/jobs → 既存ジョブ編集
+  旧: https://apple-receipt-collector-1058930671833.asia-northeast1.run.app/api/sync/trigger
+  新: https://eight0808.pythonanywhere.com/api/sync/trigger
+
+  ヘッダ X-Cron-Token はそのまま継続使用
+
+----------------------------------
+ステップ8: 手動同期テスト
+----------------------------------
+PA上のWebUIで「今すぐ同期」ボタンを押す
+→ Apple領収書PDFがDriveに保存されることを確認
+
+----------------------------------
+ステップ9: 旧Cloud Run停止（任意・後日でも可）
+----------------------------------
+GCP Console → Cloud Run → apple-receipt-collector → 削除
+（カード期限切れでもう動かないので放置でも0円。気が向いたら削除）
+
+----------------------------------
+注意事項
+----------------------------------
+- PA Free は外部HTTP接続が制限あり (Google APIsは許可済み・通常通り動く)
+- SQLiteファイルは ~/apple-receipt-collector/data/state.sqlite3 に保存
+- PA Free は web app が3ヶ月無アクセスでsleepするが、cron-job.org が毎時叩くので常時起動
+- ログは ~/apple-receipt-collector/logs/ + PAダッシュボード「Web」タブの error log
+
+----------------------------------
+Cloudflare Watchdog 再設定（任意）
+----------------------------------
+通知止めるためcron triggerを削除済み。再開する場合:
+  wrangler.toml の TARGET_URL を新URLに更新:
+    TARGET_URL = "https://eight0808.pythonanywhere.com/health"
+  CF Dashboard → Workers → apple-receipt-watchdog → Settings → Triggers
+  → Add Cron Trigger: */15 * * * *  (15分毎で十分)
